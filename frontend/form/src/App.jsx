@@ -1,16 +1,35 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
-import { useReactToPrint } from 'react-to-print'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import SignatureCanvas from 'react-signature-canvas'
 import './App.css'
+
+// Helper function to convert number to words (Indian Numbering System)
+const numberToWords = (num) => {
+  if (num === 0) return 'Zero Only';
+  if (!num || isNaN(num)) return '';
+
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const inWords = (n) => {
+    if (n < 20) return a[n];
+    if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+    if (n < 1000) return a[Math.floor(n / 100)] + 'Hundred ' + (n % 100 !== 0 ? 'And ' + inWords(n % 100) : '');
+    if (n < 100000) return inWords(Math.floor(n / 1000)) + 'Thousand ' + (n % 1000 !== 0 ? inWords(n % 1000) : '');
+    if (n < 10000000) return inWords(Math.floor(n / 100000)) + 'Lakh ' + (n % 100000 !== 0 ? inWords(n % 100000) : '');
+    return inWords(Math.floor(n / 10000000)) + 'Crore ' + (n % 10000000 !== 0 ? inWords(n % 10000000) : '');
+  };
+
+  return inWords(Math.round(num)).trim() + ' Only';
+}
 
 const App = () => {
   const componentRef = useRef(null);
   const sigCanvasRef = useRef(null);
   const execCanvasRef = useRef(null);
-  const handlePrint = useReactToPrint({
-    contentRef: componentRef,
-  });
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const [formData, setFormData] = useState({
     date: '',
@@ -42,6 +61,27 @@ const App = () => {
     customerSig: '',
     executiveSig: ''
   })
+
+  // Automatic Calculations Logic
+  useEffect(() => {
+    const total = parseFloat(formData.total) || 0;
+    const gstRate = 0.18;
+    const calculatedGst = total * gstRate;
+    const calculatedGrandTotal = total + calculatedGst;
+
+    // Only update if values actually changed to avoid infinite loop
+    if (
+      formData.gstAmount !== calculatedGst.toFixed(2) ||
+      formData.grandTotal !== calculatedGrandTotal.toFixed(2)
+    ) {
+      setFormData(prev => ({
+        ...prev,
+        gstAmount: calculatedGst.toFixed(2),
+        grandTotal: calculatedGrandTotal.toFixed(2),
+        paymentAmountWords: numberToWords(calculatedGrandTotal)
+      }));
+    }
+  }, [formData.total]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -80,18 +120,87 @@ const App = () => {
     e.preventDefault()
     try {
       console.log('Submitting Form Data:', formData)
-      // Save to Backend using the computer's Local IP so mobile devices can access it
-      const response = await axios.post('http://192.168.1.23:8080/api/forms', formData)
+      // Save to Backend using the live Railway URL so mobile devices can access it
+      const response = await axios.post('https://spring-backend-production-6e59.up.railway.app/api/forms', formData)
       console.log('Server Response:', response.data)
-      
+
       alert('Data saved successfully to database!')
-      
-      // Trigger Print/Download
-      handlePrint();
+
+      setIsSubmitted(true);
     } catch (error) {
       console.error('Error submitting form:', error)
       alert('Error saving data. Make sure backend is running.')
     }
+  }
+
+  const handleDownloadPDF = () => {
+    const element = componentRef.current;
+
+    // Temporarily hide clear buttons before generating PDF
+    const clearButtons = element.querySelectorAll('.btn-clear, button');
+    clearButtons.forEach(btn => btn.style.display = 'none');
+
+    // CRITICAL FIX: To prevent html2canvas' famous font-squishing bug inside input tags,
+    // we temporarily replace all text inputs with styled spans containing their text content!
+    const textInputs = element.querySelectorAll('input[type="text"], input[type="email"], input[type="date"], textarea');
+    const swapped = [];
+    textInputs.forEach(input => {
+      const span = document.createElement('span');
+      span.innerText = input.value || '';
+      span.className = input.className;
+
+      // Copy critical computed styles for an exact visual match
+      const comp = window.getComputedStyle(input);
+      span.style.cssText = comp.cssText;
+      span.style.border = comp.border;
+      span.style.borderBottom = comp.borderBottom;
+      span.style.display = 'inline-block';
+      span.style.height = comp.height;
+      span.style.minHeight = comp.minHeight;
+
+      input.parentNode.insertBefore(span, input);
+      input.style.display = 'none'; // Hide actual input
+      swapped.push({ input, span });
+    });
+
+    // Handle checkboxes and radios standardly
+    const boxInputs = element.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+    boxInputs.forEach(input => {
+      if (input.checked) input.setAttribute('checked', 'checked');
+      else input.removeAttribute('checked');
+    });
+
+    // Add useCORS: true to fetch the external logo correctly
+    html2canvas(element, { scale: 2, windowWidth: 1000, useCORS: true, allowTaint: true }).then((canvas) => {
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+
+      // Setup standard A4 portrait PDF format
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Find ratio to shrink the total snapshot into precisely 1 page logic
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const finalWidth = imgWidth * ratio;
+      const finalHeight = imgHeight * ratio;
+
+      // Maximum constraint (leaves a 4mm margin top/bottom)
+      const fitHeight = Math.min(finalHeight, pdfHeight - 8);
+      const fitWidth = imgWidth * (fitHeight / imgHeight);
+      const fitMarginX = (pdfWidth - fitWidth) / 2;
+
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', fitMarginX, 4, fitWidth, fitHeight); // Add precisely within constraints
+      pdf.save(`order_form_${formData.companyName || 'bny'}.pdf`);
+
+      // RESTORE EVERYTHING immediately
+      clearButtons.forEach(btn => btn.style.display = 'inline-block');
+      swapped.forEach(item => {
+        item.input.style.display = ''; // reveal input
+        item.span.parentNode.removeChild(item.span); // remove fake span
+      });
+    });
   }
 
   return (
@@ -101,7 +210,7 @@ const App = () => {
           <div className="header-left">
             <div className="logo-section">
               <div className="logo-circle">
-                <img src="https://bnytechnologies.com/wp-content/uploads/2020/10/wplogo-2.png" alt="logo" height={130} width={130} />
+                <img src="/bny-logo.png" alt="logo" height={130} width={130} />
                 <sup className="trademark">TM</sup>
               </div>
             </div>
@@ -143,8 +252,8 @@ const App = () => {
           </div>
           {/* Row 3: Address Line 2 & Pin Code */}
           <div className="customer-grid">
-            <div className="customer-row" style={{ flex: 1.5 }}>
-              <input type="text" name="addressLine2" value={formData.addressLine2} onChange={handleChange} className="line-input" style={{ marginLeft: '75px' }} />
+            <div className="customer-row">
+              <input type="text" name="addressLine2" value={formData.addressLine2} onChange={handleChange} className="line-input" placeholder="Address Line 2" />
             </div>
             <div className="customer-row">
               <span className="bold-label">Pin Code :</span>
@@ -154,7 +263,7 @@ const App = () => {
 
           {/* Row 4: Contact Person & Phone */}
           <div className="customer-grid">
-            <div className="customer-row" style={{ flex: 1.5 }}>
+            <div className="customer-row">
               <span className="bold-label">Contact Person ( Mr/Mrs ) :</span>
               <input type="text" name="contactPerson" value={formData.contactPerson} onChange={handleChange} className="line-input" />
             </div>
@@ -166,7 +275,7 @@ const App = () => {
 
           {/* Row 5: Email Id & GST */}
           <div className="customer-grid">
-            <div className="customer-row" style={{ flex: 1.5 }}>
+            <div className="customer-row">
               <span className="bold-label">Email Id :</span>
               <input type="email" name="emailId" value={formData.emailId} onChange={handleChange} className="line-input" />
             </div>
@@ -375,32 +484,32 @@ const App = () => {
         <footer className="final-footer">
           <section className="signature-section">
             <div className="sig-item">
-              <div style={{ border: '1px dashed #7ea3ff', borderRadius: '8px', background: 'rgba(255,255,255,0.5)', marginBottom: '5px' }}>
-                <SignatureCanvas 
-                  ref={sigCanvasRef} 
+              <div className="sig-canvas-wrapper">
+                <SignatureCanvas
+                  ref={sigCanvasRef}
                   penColor='black'
-                  canvasProps={{width: 250, height: 80, className: 'sigCanvas'}} 
+                  canvasProps={{ width: 250, height: 80, className: 'sigCanvas' }}
                 />
               </div>
-              <button 
-                type="button" 
-                onClick={() => sigCanvasRef.current.clear()} 
-                style={{ fontSize: '11px', padding: '3px 8px', marginBottom: '5px', borderRadius: '5px', border: '1px solid #7ea3ff', background: '#fff', cursor: 'pointer' }}
+              <button
+                type="button"
+                className="btn-clear-sig no-print"
+                onClick={() => sigCanvasRef.current.clear()}
               >Clear</button>
               <p className="sig-text">Customer's Signature & Stamp</p>
             </div>
             <div className="sig-item">
-              <div style={{ border: '1px dashed #7ea3ff', borderRadius: '8px', background: 'rgba(255,255,255,0.5)', marginBottom: '5px' }}>
-                <SignatureCanvas 
-                  ref={execCanvasRef} 
+              <div className="sig-canvas-wrapper">
+                <SignatureCanvas
+                  ref={execCanvasRef}
                   penColor='black'
-                  canvasProps={{width: 250, height: 80, className: 'sigCanvas'}} 
+                  canvasProps={{ width: 250, height: 80, className: 'sigCanvas' }}
                 />
               </div>
-              <button 
-                type="button" 
-                onClick={() => execCanvasRef.current.clear()} 
-                style={{ fontSize: '11px', padding: '3px 8px', marginBottom: '5px', borderRadius: '5px', border: '1px solid #7ea3ff', background: '#fff', cursor: 'pointer' }}
+              <button
+                type="button"
+                className="btn-clear-sig no-print"
+                onClick={() => execCanvasRef.current.clear()}
               >Clear</button>
               <p className="sig-text">Signature Executive</p>
             </div>
@@ -427,8 +536,12 @@ const App = () => {
 
 
 
-        <div className="submit-section-final">
-          <button type="submit" onClick={handleSubmit} className="btn-submit-pro">Submit Form</button>
+        <div className="submit-section-final no-print" style={{ textAlign: 'center', padding: '20px' }}>
+          {!isSubmitted ? (
+            <button type="submit" onClick={handleSubmit} className="btn-submit-pro">Submit Form</button>
+          ) : (
+            <button type="button" onClick={handleDownloadPDF} className="btn-submit-pro" style={{ background: 'linear-gradient(135deg, #0ba360 0%, #3cba92 100%)' }}>Download as PDF</button>
+          )}
         </div>
       </div >
     </div >

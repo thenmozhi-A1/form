@@ -10,13 +10,14 @@ const App = () => {
   const componentRef = useRef(null);
   const sigCanvasRef = useRef(null);
   const execCanvasRef = useRef(null);
+  const today = new Date().toISOString().split('T')[0];
 
   const downloadPDF = async () => {
     const element = componentRef.current;
-    
-    const canvas = await html2canvas(element, { 
-      scale: 2, 
-      useCORS: true, 
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
       windowWidth: 1200,
       onclone: (clonedDoc) => {
         // Hide the submit button in the PDF
@@ -27,7 +28,7 @@ const App = () => {
         inputs.forEach(input => {
           const span = clonedDoc.createElement('span');
           span.innerText = input.value;
-          
+
           // Manually copy the most important styles
           const compStyle = clonedDoc.defaultView.getComputedStyle(input);
           span.style.fontFamily = compStyle.fontFamily;
@@ -48,32 +49,32 @@ const App = () => {
           span.style.padding = compStyle.padding;
           span.style.margin = compStyle.margin;
           span.style.boxSizing = 'border-box';
-          
+
           input.parentNode.replaceChild(span, input);
         });
       }
     });
-    
+
     const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const pdf = new jsPDF('p', 'mm', 'a4');
-    
+
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
-    
+
     const imgProps = pdf.getImageProperties(imgData);
     const imgWidth = pdfWidth;
     const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-    
+
     // Force fit to exactly 1 page vertically
     if (imgHeight > pdfHeight) {
-       const scaleFactor = pdfHeight / imgHeight;
-       const scaledWidth = imgWidth * scaleFactor;
-       const xOffset = (pdfWidth - scaledWidth) / 2;
-       pdf.addImage(imgData, 'JPEG', xOffset, 0, scaledWidth, pdfHeight);
+      const scaleFactor = pdfHeight / imgHeight;
+      const scaledWidth = imgWidth * scaleFactor;
+      const xOffset = (pdfWidth - scaledWidth) / 2;
+      pdf.addImage(imgData, 'JPEG', xOffset, 0, scaledWidth, pdfHeight);
     } else {
-       pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
     }
-    
+
     pdf.save('BY_Technologies_Order_Form.pdf');
   };
 
@@ -215,7 +216,13 @@ const App = () => {
           <div className="header-right">
             <div className="header-input-group">
               <label>Date :</label>
-              <input type="text" name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleChange} />
+              <input 
+                type="date" 
+                name="date" 
+                min={today} 
+                value={formData.date} 
+                onChange={handleChange} 
+              />
             </div>
             <div className="header-input-group">
               <label>City :</label>

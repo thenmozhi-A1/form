@@ -27,7 +27,14 @@ const App = () => {
         const inputs = clonedDoc.querySelectorAll('input[type="text"], input[type="date"], input[type="email"]');
         inputs.forEach(input => {
           const span = clonedDoc.createElement('span');
-          span.innerText = input.value;
+          let displayValue = input.value;
+          
+          if (input.type === 'date' && displayValue) {
+            const [y, m, d] = displayValue.split('-');
+            displayValue = `${d}/${m}/${y}`;
+          }
+          
+          span.innerText = displayValue;
 
           // Manually copy the most important styles
           const compStyle = clonedDoc.defaultView.getComputedStyle(input);
@@ -187,6 +194,12 @@ const App = () => {
     }
   }
 
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
   return (
     <div className='page-container'>
       <div className="form-wrapper" ref={componentRef}>
@@ -216,13 +229,46 @@ const App = () => {
           <div className="header-right">
             <div className="header-input-group">
               <label>Date :</label>
-              <input 
-                type="date" 
-                name="date" 
-                min={today} 
-                value={formData.date} 
-                onChange={handleChange} 
-              />
+              <div style={{ position: 'relative', width: '200px' }}>
+                <input
+                  type="date"
+                  name="date"
+                  min={today}
+                  value={formData.date}
+                  onChange={handleChange}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer',
+                    zIndex: 2
+                  }}
+                />
+                <input
+                  type="text"
+                  readOnly
+                  value={formatDateForDisplay(formData.date)}
+                  placeholder="DD/MM/YYYY"
+                  style={{
+                    width: '100%',
+                    padding: '5px',
+                    textAlign: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 1
+                  }}
+                />
+                <span style={{ 
+                  position: 'absolute', 
+                  right: '10px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  fontSize: '10px'
+                }}>▼</span>
+              </div>
             </div>
             <div className="header-input-group">
               <label>City :</label>

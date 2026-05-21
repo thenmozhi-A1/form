@@ -39,9 +39,8 @@ public class SubscriptionForm {
     private String keywords;
     private String domainName;
 
-    @ElementCollection
-    @CollectionTable(name = "form_additional_plans", joinColumns = @JoinColumn(name = "form_id"))
-    @Column(name = "plan")
+    @Convert(converter = StringListConverter.class)
+    @Column(name = "additional_plans")
     private List<String> additionalPlans;
 
     // Payment Info

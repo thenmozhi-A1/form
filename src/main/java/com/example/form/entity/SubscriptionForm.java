@@ -38,6 +38,8 @@ public class SubscriptionForm {
     private String websiteSEO;
     private String keywords;
     private String domainName;
+    private String priceRs;
+    private String amount;
 
     @Convert(converter = StringListConverter.class)
     @Column(name = "additional_plans")

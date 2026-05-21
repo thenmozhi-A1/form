@@ -29,12 +29,26 @@ public class SubscriptionFormDTO {
     private String customerSig;
     private String executiveSig;
     
+    private String formType;
     private SubscriptionDetails subscription;
+    private RenewalDetails renewal;
 
     @Data
     public static class SubscriptionDetails {
         private String websiteSEO;
         private String keywords;
         private List<String> additionalPlans;
+        private String priceRs;
+        private String amount;
+    }
+
+    @Data
+    public static class RenewalDetails {
+        private String item1;
+        private String item2;
+        private String item3;
+        private String item4;
+        private String priceRs;
+        private String amount;
     }
 }

@@ -38,8 +38,17 @@ public class SubscriptionForm {
     private String websiteSEO;
     private String keywords;
     private String domainName;
+    
+    // Form Type and common price fields
+    private String formType;
     private String priceRs;
     private String amount;
+
+    // Renewal specific fields
+    private String renewalItem1;
+    private String renewalItem2;
+    private String renewalItem3;
+    private String renewalItem4;
 
     @Convert(converter = StringListConverter.class)
     @Column(name = "additional_plans")

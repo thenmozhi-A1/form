@@ -20,6 +20,7 @@ public class FormController {
         SubscriptionForm form = new SubscriptionForm();
         
         // Map DTO to Entity
+        form.setFormType(dto.getFormType());
         form.setDate(dto.getDate());
         form.setCity(dto.getCity());
         form.setCompanyName(dto.getCompanyName());
@@ -45,10 +46,22 @@ public class FormController {
         form.setExecutiveSig(dto.getExecutiveSig());
         
         // Nested Subscription details
-        if (dto.getSubscription() != null) {
+        if (dto.getSubscription() != null && "Fresh".equals(dto.getFormType())) {
             form.setWebsiteSEO(dto.getSubscription().getWebsiteSEO());
             form.setKeywords(dto.getSubscription().getKeywords());
             form.setAdditionalPlans(dto.getSubscription().getAdditionalPlans());
+            form.setPriceRs(dto.getSubscription().getPriceRs());
+            form.setAmount(dto.getSubscription().getAmount());
+        }
+
+        // Nested Renewal details
+        if (dto.getRenewal() != null && "Renewal".equals(dto.getFormType())) {
+            form.setRenewalItem1(dto.getRenewal().getItem1());
+            form.setRenewalItem2(dto.getRenewal().getItem2());
+            form.setRenewalItem3(dto.getRenewal().getItem3());
+            form.setRenewalItem4(dto.getRenewal().getItem4());
+            form.setPriceRs(dto.getRenewal().getPriceRs());
+            form.setAmount(dto.getRenewal().getAmount());
         }
 
         SubscriptionForm savedForm = repository.save(form);
